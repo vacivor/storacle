@@ -44,42 +44,42 @@ public final class ObjectStorageTemplate {
         ObjectMetadata baseMetadata = request.metadata() == null ? ObjectMetadata.empty() : request.metadata();
         String objectKey = request.objectKey();
 
+        InputStream originalContent = request.content();
         try {
-            byte[] prefix = request.content().readNBytes(request.peekBytes());
-            InputStream content = new SequenceInputStream(new ByteArrayInputStream(prefix), request.content());
-            String contentType = baseMetadata.contentType() == null
-                    ? contentTypeDetector.detect(prefix, request.originalFilename())
-                    : baseMetadata.contentType();
+            byte[] prefix = originalContent.readNBytes(request.peekBytes());
+            try (InputStream content = new SequenceInputStream(new ByteArrayInputStream(prefix), originalContent)) {
+                String contentType = baseMetadata.contentType() == null
+                        ? contentTypeDetector.detect(prefix, request.originalFilename())
+                        : baseMetadata.contentType();
 
-            ObjectMetadata.Builder metadataBuilder = ObjectMetadata.builder(baseMetadata);
-            if (baseMetadata.contentType() == null) {
-                metadataBuilder.contentType(contentType);
-            }
-            if (baseMetadata.contentLength() == null && request.contentLength() >= 0) {
-                metadataBuilder.contentLength(request.contentLength());
-            }
-            ObjectMetadata resolvedMetadata = metadataBuilder.build();
+                ObjectMetadata.Builder metadataBuilder = ObjectMetadata.builder(baseMetadata);
+                if (baseMetadata.contentType() == null) {
+                    metadataBuilder.contentType(contentType);
+                }
+                if (baseMetadata.contentLength() == null && request.contentLength() >= 0) {
+                    metadataBuilder.contentLength(request.contentLength());
+                }
+                ObjectMetadata resolvedMetadata = metadataBuilder.build();
 
-            if (objectKey == null || objectKey.isBlank()) {
-                FilenameContext context = FilenameContext.of(request.originalFilename(), request.prefix(), contentType);
-                objectKey = filenameGenerator.generate(context);
-            }
+                if (objectKey == null || objectKey.isBlank()) {
+                    FilenameContext context = FilenameContext.of(request.originalFilename(), request.prefix(), contentType);
+                    objectKey = filenameGenerator.generate(context);
+                }
 
-            return client.put(ObjectPath.of(request.bucket(), objectKey), content, resolvedMetadata);
+                return client.put(ObjectPath.of(request.bucket(), objectKey), content, resolvedMetadata);
+            }
         } catch (IOException e) {
+            try {
+                originalContent.close();
+            } catch (IOException ignored) {
+                // Best effort.
+            }
             throw new StorageException("Failed to read upload content", e);
         }
     }
 
     public ObjectWriteResult upload(String bucket, String objectKey, InputStream content, ObjectMetadata metadata) {
-        Objects.requireNonNull(content, "content must not be null");
-        UploadRequest request = UploadRequest.builder()
-                .bucket(bucket)
-                .objectKey(objectKey)
-                .content(content)
-                .metadata(metadata)
-                .build();
-        return upload(request);
+        return client.put(bucket, objectKey, content, metadata);
     }
 
     public ObjectWriteResult upload(String bucket, String originalFilename, String prefix, byte[] bytes) {
@@ -96,18 +96,13 @@ public final class ObjectStorageTemplate {
 
     public ObjectWriteResult upload(String bucket, String originalFilename, String prefix, File file) {
         Objects.requireNonNull(file, "file must not be null");
-        try {
-            UploadRequest request = UploadRequest.builder()
-                    .bucket(bucket)
-                    .originalFilename(originalFilename != null ? originalFilename : file.getName())
-                    .prefix(prefix)
-                    .content(new FileInputStream(file))
-                    .contentLength(file.length())
-                    .build();
-            return upload(request);
-        } catch (IOException e) {
-            throw new StorageException("Failed to read file for upload", e);
-        }
+        UploadRequest request = UploadRequest.builder()
+                .bucket(bucket)
+                .originalFilename(originalFilename != null ? originalFilename : file.getName())
+                .prefix(prefix)
+                .content(file)
+                .build();
+        return upload(request);
     }
 
     public StorageObject get(ObjectPath path) {
@@ -116,12 +111,7 @@ public final class ObjectStorageTemplate {
     }
 
     public byte[] getBytes(ObjectPath path) {
-        StorageObject object = get(path);
-        try (InputStream content = object.content()) {
-            return content.readAllBytes();
-        } catch (IOException e) {
-            throw new StorageException("Failed to read object content", e);
-        }
+        return client.getBytes(path);
     }
 
     public boolean exists(ObjectPath path) {
@@ -135,17 +125,7 @@ public final class ObjectStorageTemplate {
     }
 
     public int delete(Iterable<ObjectPath> paths) {
-        Objects.requireNonNull(paths, "paths must not be null");
-        int deleted = 0;
-        for (ObjectPath path : paths) {
-            if (path == null) {
-                continue;
-            }
-            if (client.delete(path)) {
-                deleted++;
-            }
-        }
-        return deleted;
+        return client.delete(paths);
     }
 
     public ListObjectsPage list(ListObjectsRequest request) {
@@ -154,13 +134,7 @@ public final class ObjectStorageTemplate {
     }
 
     public ListObjectsPage list(String bucket, String prefix, int maxKeys, String continuationToken) {
-        ListObjectsRequest request = ListObjectsRequest.builder()
-                .bucket(bucket)
-                .prefix(prefix)
-                .maxKeys(maxKeys)
-                .continuationToken(continuationToken)
-                .build();
-        return list(request);
+        return client.list(bucket, prefix, maxKeys, continuationToken);
     }
 
     public ObjectWriteResult copy(ObjectPath source, ObjectPath target, ObjectMetadata metadataOverride) {
@@ -170,7 +144,7 @@ public final class ObjectStorageTemplate {
     }
 
     public ObjectWriteResult copy(ObjectPath source, ObjectPath target) {
-        return copy(source, target, null);
+        return client.copy(source, target);
     }
 
     public ObjectStorageClient objectStorageClient() {

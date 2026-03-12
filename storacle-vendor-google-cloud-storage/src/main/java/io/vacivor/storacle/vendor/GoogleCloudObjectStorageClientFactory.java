@@ -29,11 +29,11 @@ public final class GoogleCloudObjectStorageClientFactory extends AbstractObjectS
             StorageOptions.Builder builder = StorageOptions.newBuilder();
             StorageVendorOptions options = config.options();
             String projectId = options.get("projectId");
-            if (projectId != null && !projectId.isBlank()) {
+            if (hasText(projectId)) {
                 builder.setProjectId(projectId);
             }
             String endpoint = config.endpoint();
-            if (endpoint != null && !endpoint.isBlank()) {
+            if (hasText(endpoint)) {
                 builder.setHost(endpoint);
             }
 
@@ -52,12 +52,12 @@ public final class GoogleCloudObjectStorageClientFactory extends AbstractObjectS
     private GoogleCredentials resolveCredentials(StorageVendorConfig config) throws IOException {
         StorageVendorOptions options = config.options();
         String credentialsJson = options.get("credentialsJson");
-        if (credentialsJson != null && !credentialsJson.isBlank()) {
+        if (hasText(credentialsJson)) {
             InputStream stream = new ByteArrayInputStream(credentialsJson.getBytes(StandardCharsets.UTF_8));
             return GoogleCredentials.fromStream(stream);
         }
         String credentialsPath = options.get("credentialsPath");
-        if (credentialsPath != null && !credentialsPath.isBlank()) {
+        if (hasText(credentialsPath)) {
             try (InputStream stream = Files.newInputStream(Path.of(credentialsPath))) {
                 return GoogleCredentials.fromStream(stream);
             }

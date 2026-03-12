@@ -27,11 +27,4 @@ public final class BaiduBosObjectStorageClientFactory extends AbstractObjectStor
         BosClient client = new BosClient(configuration);
         return new BaiduBosStorageClient(client);
     }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
-    }
 }

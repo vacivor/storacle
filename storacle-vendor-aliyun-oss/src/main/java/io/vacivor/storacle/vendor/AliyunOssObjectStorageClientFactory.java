@@ -22,11 +22,4 @@ public final class AliyunOssObjectStorageClientFactory extends AbstractObjectSto
         OSS client = new OSSClientBuilder().build(endpoint, accessKey, secretKey);
         return new AliyunOssStorageClient(client);
     }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
-    }
 }

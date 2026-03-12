@@ -11,4 +11,5 @@ include(
     "storacle-vendor-amazon-s3",
     "storacle-vendor-aliyun-oss",
     "storacle-spring-boot-starter",
+    "storacle-spring-boot-example",
 )

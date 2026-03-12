@@ -1,11 +1,3 @@
-plugins {
-    `java-library`
-}
-
-java {
-    toolchain { languageVersion = JavaLanguageVersion.of(25) }
-}
-
 val huaweiObsVersion: String by rootProject.extra
 
 dependencies {

@@ -24,7 +24,7 @@ public final class TencentCosObjectStorageClientFactory extends AbstractObjectSt
 
         COSCredentials credentials = new BasicCOSCredentials(accessKey, secretKey);
         ClientConfig clientConfig = new ClientConfig(new Region(region));
-        if (config.endpoint() != null && !config.endpoint().isBlank()) {
+        if (hasText(config.endpoint())) {
             setEndpointIfSupported(clientConfig, stripScheme(config.endpoint()));
         }
 
@@ -46,15 +46,8 @@ public final class TencentCosObjectStorageClientFactory extends AbstractObjectSt
         try {
             java.lang.reflect.Method method = ClientConfig.class.getMethod("setEndpointSuffix", String.class);
             method.invoke(clientConfig, endpoint);
-        } catch (Exception ignored) {
+        } catch (ReflectiveOperationException ignored) {
             // Endpoint customization isn't available in this SDK version.
         }
-    }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
     }
 }

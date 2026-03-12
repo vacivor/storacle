@@ -1,18 +1,5 @@
 plugins {
-    `java-library`
     id("io.spring.dependency-management")
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
-    withSourcesJar()
-    withJavadocJar()
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
 }
 
 val springBootVersion: String by rootProject.extra

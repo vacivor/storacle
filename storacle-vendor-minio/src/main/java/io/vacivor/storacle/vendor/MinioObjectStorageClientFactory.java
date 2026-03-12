@@ -15,7 +15,7 @@ public final class MinioObjectStorageClientFactory extends AbstractObjectStorage
         assertVendor(config);
 
         String endpoint = config.endpoint();
-        if (endpoint == null || endpoint.isBlank()) {
+        if (!hasText(endpoint)) {
             endpoint = "http://localhost:9000";
         }
         String accessKey = requireNonBlank(config.accessKey(), "accessKey");
@@ -27,12 +27,5 @@ public final class MinioObjectStorageClientFactory extends AbstractObjectStorage
                 .build();
 
         return new MinioStorageClient(client);
-    }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
     }
 }

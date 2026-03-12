@@ -21,11 +21,4 @@ public final class HuaweiObsObjectStorageClientFactory extends AbstractObjectSto
         ObsClient client = new ObsClient(accessKey, secretKey, endpoint);
         return new HuaweiObsStorageClient(client);
     }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
-    }
 }

@@ -1,7 +1,5 @@
 package io.vacivor.storacle.client;
 
-import java.util.Objects;
-
 import com.google.api.gax.paging.Page;
 import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
@@ -11,11 +9,13 @@ import com.google.cloud.storage.CopyWriter;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.Storage.CopyRequest;
 import com.google.cloud.storage.Storage.BlobListOption;
+import io.vacivor.storacle.AbstractObjectStorageClient;
 import io.vacivor.storacle.ListObjectsPage;
 import io.vacivor.storacle.ListObjectsRequest;
 import io.vacivor.storacle.ObjectMetadata;
+import io.vacivor.storacle.ObjectMetadataMapper;
 import io.vacivor.storacle.ObjectPath;
-import io.vacivor.storacle.ObjectStorageClient;
+import io.vacivor.storacle.ObjectStorageValueFactory;
 import io.vacivor.storacle.ObjectSummary;
 import io.vacivor.storacle.ObjectWriteResult;
 import io.vacivor.storacle.StorageException;
@@ -25,45 +25,34 @@ import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.time.Instant;
 
-public final class GoogleCloudStorageClient implements ObjectStorageClient {
+public final class GoogleCloudStorageClient extends AbstractObjectStorageClient {
     private final Storage storage;
 
     public GoogleCloudStorageClient(Storage storage) {
-        this.storage = Objects.requireNonNull(storage, "storage must not be null");
+        this.storage = java.util.Objects.requireNonNull(storage, "storage must not be null");
     }
 
     @Override
     public ObjectWriteResult put(ObjectPath path, InputStream content, ObjectMetadata metadata) {
-        Objects.requireNonNull(path, "path must not be null");
-        Objects.requireNonNull(content, "content must not be null");
-        ObjectMetadata safeMetadata = metadata == null ? ObjectMetadata.empty() : metadata;
+        path = requirePath(path);
+        content = requireContent(content);
+        ObjectMetadata safeMetadata = safeMetadata(metadata);
 
         try {
             BlobId blobId = BlobId.of(path.bucket(), path.key());
             BlobInfo.Builder infoBuilder = BlobInfo.newBuilder(blobId);
-            if (safeMetadata.contentType() != null) {
-                infoBuilder.setContentType(safeMetadata.contentType());
-            }
-            if (safeMetadata.cacheControl() != null) {
-                infoBuilder.setCacheControl(safeMetadata.cacheControl());
-            }
-            if (safeMetadata.contentDisposition() != null) {
-                infoBuilder.setContentDisposition(safeMetadata.contentDisposition());
-            }
-            if (!safeMetadata.userMetadata().isEmpty()) {
-                infoBuilder.setMetadata(safeMetadata.userMetadata());
-            }
+            applyMetadata(infoBuilder, safeMetadata);
 
             storage.create(infoBuilder.build(), content);
             return new ObjectWriteResult(path, null, null);
         } catch (Exception e) {
-            throw new StorageException("Failed to put object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("put", path, e);
         }
     }
 
     @Override
     public StorageObject get(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             BlobId blobId = BlobId.of(path.bucket(), path.key());
             Blob blob = storage.get(blobId);
@@ -71,70 +60,70 @@ public final class GoogleCloudStorageClient implements ObjectStorageClient {
                 throw new StorageException("Object not found: " + path.bucket() + "/" + path.key());
             }
 
-            ObjectMetadata metadata = ObjectMetadata.builder()
-                    .contentType(blob.getContentType())
-                    .contentLength(blob.getSize())
-                    .cacheControl(blob.getCacheControl())
-                    .contentDisposition(blob.getContentDisposition())
-                    .userMetadata(blob.getMetadata())
-                    .build();
+            ObjectMetadata metadata = ObjectMetadataMapper.from(
+                    blob::getContentType,
+                    blob::getSize,
+                    blob::getCacheControl,
+                    blob::getContentDisposition,
+                    blob::getMetadata
+            );
 
             ReadChannel channel = storage.reader(blobId);
-            return new StorageObject(path, metadata, Channels.newInputStream(channel));
+            return ObjectStorageValueFactory.storageObject(path, metadata, Channels.newInputStream(channel));
         } catch (Exception e) {
-            throw new StorageException("Failed to get object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("get", path, e);
         }
     }
 
     @Override
     public boolean delete(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             return storage.delete(BlobId.of(path.bucket(), path.key()));
         } catch (Exception e) {
-            throw new StorageException("Failed to delete object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("delete", path, e);
         }
     }
 
     @Override
     public boolean exists(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             return storage.get(BlobId.of(path.bucket(), path.key())) != null;
         } catch (Exception e) {
-            throw new StorageException("Failed to check object existence: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("check object existence", path, e);
         }
     }
 
     @Override
     public ListObjectsPage list(ListObjectsRequest request) {
-        Objects.requireNonNull(request, "request must not be null");
+        ListObjectsRequest validatedRequest = requireListRequest(request);
         try {
-            if (request.continuationToken() == null || request.continuationToken().isBlank()) {
+            if (validatedRequest.continuationToken() == null || validatedRequest.continuationToken().isBlank()) {
                 Page<Blob> page = storage.list(
-                    request.bucket(),
-                    BlobListOption.prefix(request.prefix()),
-                    BlobListOption.pageSize(request.maxKeys())
+                    validatedRequest.bucket(),
+                    BlobListOption.prefix(validatedRequest.prefix()),
+                    BlobListOption.pageSize(validatedRequest.maxKeys())
                 );
-                return toPage(request.bucket(), page);
+                return toPage(validatedRequest.bucket(), page);
             }
             Page<Blob> page = storage.list(
-                    request.bucket(),
-                    BlobListOption.prefix(request.prefix()),
-                    BlobListOption.pageSize(request.maxKeys()),
-                    BlobListOption.pageToken(request.continuationToken())
+                    validatedRequest.bucket(),
+                    BlobListOption.prefix(validatedRequest.prefix()),
+                    BlobListOption.pageSize(validatedRequest.maxKeys()),
+                    BlobListOption.pageToken(validatedRequest.continuationToken())
             );
 
-            return toPage(request.bucket(), page);
+            return toPage(validatedRequest.bucket(), page);
         } catch (Exception e) {
-            throw new StorageException("Failed to list objects for bucket: " + request.bucket(), e);
+            throw bucketFailure("list", validatedRequest.bucket(), e);
         }
     }
 
     @Override
     public ObjectWriteResult copy(ObjectPath source, ObjectPath target, ObjectMetadata metadataOverride) {
-        Objects.requireNonNull(source, "source must not be null");
-        Objects.requireNonNull(target, "target must not be null");
+        source = requirePath(source);
+        target = requirePath(target);
         try {
             BlobId sourceId = BlobId.of(source.bucket(), source.key());
             BlobId targetId = BlobId.of(target.bucket(), target.key());
@@ -142,18 +131,7 @@ public final class GoogleCloudStorageClient implements ObjectStorageClient {
             CopyRequest.Builder builder = CopyRequest.newBuilder().setSource(sourceId).setTarget(targetId);
             if (metadataOverride != null) {
                 BlobInfo.Builder infoBuilder = BlobInfo.newBuilder(targetId);
-                if (metadataOverride.contentType() != null) {
-                    infoBuilder.setContentType(metadataOverride.contentType());
-                }
-                if (metadataOverride.cacheControl() != null) {
-                    infoBuilder.setCacheControl(metadataOverride.cacheControl());
-                }
-                if (metadataOverride.contentDisposition() != null) {
-                    infoBuilder.setContentDisposition(metadataOverride.contentDisposition());
-                }
-                if (!metadataOverride.userMetadata().isEmpty()) {
-                    infoBuilder.setMetadata(metadataOverride.userMetadata());
-                }
+                applyMetadata(infoBuilder, metadataOverride);
                 builder.setTarget(infoBuilder.build());
             }
 
@@ -161,7 +139,7 @@ public final class GoogleCloudStorageClient implements ObjectStorageClient {
             Blob copied = writer.getResult();
             return new ObjectWriteResult(target, copied.getEtag(), null);
         } catch (Exception e) {
-            throw new StorageException("Failed to copy object: " + source.bucket() + "/" + source.key(), e);
+            throw objectFailure("copy", source, e);
         }
     }
 
@@ -175,15 +153,16 @@ public final class GoogleCloudStorageClient implements ObjectStorageClient {
         if (type.isInstance(storage)) {
             return type.cast(storage);
         }
-        return ObjectStorageClient.super.unwrap(type);
+        return super.unwrap(type);
     }
 
     private static ListObjectsPage toPage(String bucket, Page<Blob> page) {
         java.util.List<ObjectSummary> summaries = new java.util.ArrayList<>();
         for (Blob blob : page.getValues()) {
             Instant updatedAt = blob.getUpdateTime() == null ? null : Instant.ofEpochMilli(blob.getUpdateTime());
-            summaries.add(new ObjectSummary(
-                    ObjectPath.of(bucket, blob.getName()),
+            summaries.add(ObjectStorageValueFactory.objectSummary(
+                    bucket,
+                    blob.getName(),
                     blob.getSize(),
                     updatedAt,
                     blob.getEtag()));
@@ -192,5 +171,16 @@ public final class GoogleCloudStorageClient implements ObjectStorageClient {
         String nextToken = page.getNextPageToken();
         boolean truncated = page.hasNextPage();
         return new ListObjectsPage(summaries, nextToken, truncated);
+    }
+
+    private static void applyMetadata(BlobInfo.Builder builder, ObjectMetadata metadata) {
+        ObjectMetadataMapper.apply(
+                metadata,
+                builder::setContentType,
+                ignored -> { },
+                builder::setCacheControl,
+                builder::setContentDisposition,
+                builder::setMetadata
+        );
     }
 }

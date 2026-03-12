@@ -1,12 +1,12 @@
 package io.vacivor.storacle.client;
 
-import java.util.Objects;
-
+import io.vacivor.storacle.AbstractObjectStorageClient;
 import io.vacivor.storacle.ListObjectsPage;
 import io.vacivor.storacle.ListObjectsRequest;
 import io.vacivor.storacle.ObjectMetadata;
+import io.vacivor.storacle.ObjectMetadataMapper;
 import io.vacivor.storacle.ObjectPath;
-import io.vacivor.storacle.ObjectStorageClient;
+import io.vacivor.storacle.ObjectStorageValueFactory;
 import io.vacivor.storacle.ObjectSummary;
 import io.vacivor.storacle.ObjectWriteResult;
 import io.vacivor.storacle.StorageException;
@@ -35,49 +35,37 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-public final class AmazonS3StorageClient implements ObjectStorageClient {
+public final class AmazonS3StorageClient extends AbstractObjectStorageClient {
     private final S3Client client;
 
     public AmazonS3StorageClient(S3Client client) {
-        this.client = Objects.requireNonNull(client, "client must not be null");
+        this.client = java.util.Objects.requireNonNull(client, "client must not be null");
     }
 
     @Override
     public ObjectWriteResult put(ObjectPath path, InputStream content, ObjectMetadata metadata) {
-        Objects.requireNonNull(path, "path must not be null");
-        Objects.requireNonNull(content, "content must not be null");
-        ObjectMetadata safeMetadata = metadata == null ? ObjectMetadata.empty() : metadata;
+        path = requirePath(path);
+        content = requireContent(content);
+        ObjectMetadata safeMetadata = safeMetadata(metadata);
 
         try {
             PutObjectRequest.Builder builder = PutObjectRequest.builder()
                     .bucket(path.bucket())
                     .key(path.key());
-
-            if (safeMetadata.contentType() != null) {
-                builder.contentType(safeMetadata.contentType());
-            }
-            if (safeMetadata.cacheControl() != null) {
-                builder.cacheControl(safeMetadata.cacheControl());
-            }
-            if (safeMetadata.contentDisposition() != null) {
-                builder.contentDisposition(safeMetadata.contentDisposition());
-            }
-            if (!safeMetadata.userMetadata().isEmpty()) {
-                builder.metadata(safeMetadata.userMetadata());
-            }
+            applyMetadata(builder, safeMetadata);
 
             PutObjectRequest request = builder.build();
             RequestBody body = toRequestBody(content, safeMetadata);
             PutObjectResponse response = client.putObject(request, body);
             return new ObjectWriteResult(path, response.eTag(), response.versionId());
         } catch (SdkException e) {
-            throw new StorageException("Failed to put object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("put", path, e);
         }
     }
 
     @Override
     public StorageObject get(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             GetObjectRequest request = GetObjectRequest.builder()
                     .bucket(path.bucket())
@@ -85,22 +73,22 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
                     .build();
             ResponseInputStream<GetObjectResponse> response = client.getObject(request);
             GetObjectResponse meta = response.response();
-            ObjectMetadata metadata = ObjectMetadata.builder()
-                    .contentType(meta.contentType())
-                    .contentLength(meta.contentLength())
-                    .cacheControl(meta.cacheControl())
-                    .contentDisposition(meta.contentDisposition())
-                    .userMetadata(meta.metadata())
-                    .build();
-            return new StorageObject(path, metadata, response);
+            ObjectMetadata metadata = ObjectMetadataMapper.from(
+                    meta::contentType,
+                    meta::contentLength,
+                    meta::cacheControl,
+                    meta::contentDisposition,
+                    meta::metadata
+            );
+            return ObjectStorageValueFactory.storageObject(path, metadata, response);
         } catch (SdkException e) {
-            throw new StorageException("Failed to get object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("get", path, e);
         }
     }
 
     @Override
     public boolean delete(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             DeleteObjectRequest request = DeleteObjectRequest.builder()
                     .bucket(path.bucket())
@@ -109,13 +97,13 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
             client.deleteObject(request);
             return true;
         } catch (SdkException e) {
-            throw new StorageException("Failed to delete object: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("delete", path, e);
         }
     }
 
     @Override
     public boolean exists(ObjectPath path) {
-        Objects.requireNonNull(path, "path must not be null");
+        path = requirePath(path);
         try {
             HeadObjectRequest request = HeadObjectRequest.builder()
                     .bucket(path.bucket())
@@ -129,44 +117,45 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
             if (e.statusCode() == 404) {
                 return false;
             }
-            throw new StorageException("Failed to check object existence: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("check object existence", path, e);
         } catch (SdkException e) {
-            throw new StorageException("Failed to check object existence: " + path.bucket() + "/" + path.key(), e);
+            throw objectFailure("check object existence", path, e);
         }
     }
 
     @Override
     public ListObjectsPage list(ListObjectsRequest request) {
-        Objects.requireNonNull(request, "request must not be null");
+        ListObjectsRequest validatedRequest = requireListRequest(request);
         try {
             ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder()
-                    .bucket(request.bucket())
-                    .maxKeys(request.maxKeys());
-            if (request.prefix() != null) {
-                builder.prefix(request.prefix());
+                    .bucket(validatedRequest.bucket())
+                    .maxKeys(validatedRequest.maxKeys());
+            if (validatedRequest.prefix() != null) {
+                builder.prefix(validatedRequest.prefix());
             }
-            if (request.continuationToken() != null) {
-                builder.continuationToken(request.continuationToken());
+            if (validatedRequest.continuationToken() != null) {
+                builder.continuationToken(validatedRequest.continuationToken());
             }
 
             ListObjectsV2Response response = client.listObjectsV2(builder.build());
             List<ObjectSummary> summaries = response.contents().stream()
-                    .map(obj -> new ObjectSummary(
-                            ObjectPath.of(request.bucket(), obj.key()),
+                    .map(obj -> ObjectStorageValueFactory.objectSummary(
+                            validatedRequest.bucket(),
+                            obj.key(),
                             obj.size(),
                             obj.lastModified(),
                             obj.eTag()))
                     .toList();
             return new ListObjectsPage(summaries, response.nextContinuationToken(), response.isTruncated());
         } catch (SdkException e) {
-            throw new StorageException("Failed to list objects for bucket: " + request.bucket(), e);
+            throw bucketFailure("list", validatedRequest.bucket(), e);
         }
     }
 
     @Override
     public ObjectWriteResult copy(ObjectPath source, ObjectPath target, ObjectMetadata metadataOverride) {
-        Objects.requireNonNull(source, "source must not be null");
-        Objects.requireNonNull(target, "target must not be null");
+        source = requirePath(source);
+        target = requirePath(target);
         try {
             CopyObjectRequest.Builder builder = CopyObjectRequest.builder()
                     .copySource(encodeCopySource(source))
@@ -175,18 +164,7 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
 
             if (metadataOverride != null) {
                 builder.metadataDirective(MetadataDirective.REPLACE);
-                if (metadataOverride.contentType() != null) {
-                    builder.contentType(metadataOverride.contentType());
-                }
-                if (metadataOverride.cacheControl() != null) {
-                    builder.cacheControl(metadataOverride.cacheControl());
-                }
-                if (metadataOverride.contentDisposition() != null) {
-                    builder.contentDisposition(metadataOverride.contentDisposition());
-                }
-                if (!metadataOverride.userMetadata().isEmpty()) {
-                    builder.metadata(metadataOverride.userMetadata());
-                }
+                applyMetadata(builder, metadataOverride);
             } else {
                 builder.metadataDirective(MetadataDirective.COPY);
             }
@@ -195,7 +173,7 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
             String eTag = response.copyObjectResult() == null ? null : response.copyObjectResult().eTag();
             return new ObjectWriteResult(target, eTag, response.versionId());
         } catch (SdkException e) {
-            throw new StorageException("Failed to copy object: " + source.bucket() + "/" + source.key(), e);
+            throw objectFailure("copy", source, e);
         }
     }
 
@@ -209,7 +187,7 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
         if (type.isInstance(client)) {
             return type.cast(client);
         }
-        return ObjectStorageClient.super.unwrap(type);
+        return super.unwrap(type);
     }
 
     private static RequestBody toRequestBody(InputStream content, ObjectMetadata metadata) {
@@ -230,5 +208,27 @@ public final class AmazonS3StorageClient implements ObjectStorageClient {
         String encodedKey = URLEncoder.encode(path.key(), StandardCharsets.UTF_8)
                 .replace("+", "%20");
         return encodedBucket + "/" + encodedKey;
+    }
+
+    private static void applyMetadata(PutObjectRequest.Builder builder, ObjectMetadata metadata) {
+        ObjectMetadataMapper.apply(
+                metadata,
+                builder::contentType,
+                ignored -> { },
+                builder::cacheControl,
+                builder::contentDisposition,
+                builder::metadata
+        );
+    }
+
+    private static void applyMetadata(CopyObjectRequest.Builder builder, ObjectMetadata metadata) {
+        ObjectMetadataMapper.apply(
+                metadata,
+                builder::contentType,
+                ignored -> { },
+                builder::cacheControl,
+                builder::contentDisposition,
+                builder::metadata
+        );
     }
 }

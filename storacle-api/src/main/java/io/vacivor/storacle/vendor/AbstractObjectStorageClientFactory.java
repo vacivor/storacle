@@ -22,4 +22,15 @@ public abstract class AbstractObjectStorageClientFactory implements ObjectStorag
             throw new IllegalArgumentException("Vendor mismatch. Expected " + vendor.id() + " but got " + config.vendor().id());
         }
     }
+
+    protected final String requireNonBlank(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + " must not be blank");
+        }
+        return value;
+    }
+
+    protected final boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
 }

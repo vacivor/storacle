@@ -4,6 +4,10 @@ import java.util.Objects;
 
 import io.vacivor.storacle.ObjectMetadata;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 
 public final class UploadRequest {
@@ -98,6 +102,27 @@ public final class UploadRequest {
 
         public Builder content(InputStream content) {
             this.content = content;
+            return this;
+        }
+
+        public Builder content(byte[] bytes) {
+            Objects.requireNonNull(bytes, "bytes must not be null");
+            this.content = new ByteArrayInputStream(bytes);
+            this.contentLength = bytes.length;
+            return this;
+        }
+
+        public Builder content(File file) {
+            Objects.requireNonNull(file, "file must not be null");
+            try {
+                this.content = new FileInputStream(file);
+            } catch (FileNotFoundException e) {
+                throw new IllegalArgumentException("file not found: " + file.getAbsolutePath(), e);
+            }
+            if (this.originalFilename == null || this.originalFilename.isBlank()) {
+                this.originalFilename = file.getName();
+            }
+            this.contentLength = file.length();
             return this;
         }
 

@@ -1,3 +1,5 @@
+import org.gradle.api.plugins.JavaPluginExtension
+
 plugins {
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
@@ -33,5 +35,26 @@ allprojects {
 
     repositories {
         mavenCentral()
+    }
+}
+
+subprojects {
+    apply(plugin = "java-library")
+
+    extensions.configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(javaVersion)
+        }
+        withSourcesJar()
+        withJavadocJar()
+    }
+
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        "testImplementation"("org.junit.jupiter:junit-jupiter:5.11.0")
+        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 }

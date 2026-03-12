@@ -36,7 +36,7 @@ public final class AmazonS3ObjectStorageClientFactory extends AbstractObjectStor
                 .serviceConfiguration(s3Configuration)
                 .region(Region.of(region));
 
-        if (config.endpoint() != null && !config.endpoint().isBlank()) {
+        if (hasText(config.endpoint())) {
             try {
                 builder.endpointOverride(URI.create(config.endpoint()));
             } catch (IllegalArgumentException ex) {
@@ -45,12 +45,5 @@ public final class AmazonS3ObjectStorageClientFactory extends AbstractObjectStor
         }
 
         return new AmazonS3StorageClient(builder.build());
-    }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
     }
 }

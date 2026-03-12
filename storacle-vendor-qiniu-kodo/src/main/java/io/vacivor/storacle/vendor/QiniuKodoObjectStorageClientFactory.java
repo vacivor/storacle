@@ -31,11 +31,4 @@ public final class QiniuKodoObjectStorageClientFactory extends AbstractObjectSto
         QiniuDownloadUrlProvider downloadUrlProvider = new DefaultQiniuDownloadUrlProvider(auth, config.options());
         return new QiniuKodoStorageClient(auth, uploadManager, bucketManager, downloadUrlProvider);
     }
-
-    private static String requireNonBlank(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
-        }
-        return value;
-    }
 }

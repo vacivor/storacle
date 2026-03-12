@@ -25,37 +25,21 @@ public class StoracleProperties {
     }
 
     public void setVendors(Map<String, VendorProperties> vendors) {
-        this.vendors = vendors;
-    }
-
-    // Backward compatibility for old key: storacle.provider
-    public void setProvider(String provider) {
-        this.vendor = provider;
-    }
-
-    // Backward compatibility for old key: storacle.providers
-    public void setProviders(Map<String, VendorProperties> providers) {
-        this.vendors = providers;
-    }
-
-    public StorageVendor resolveVendor() {
-        return StorageVendor.fromId(vendor);
+        this.vendors = vendors == null ? new HashMap<>() : new HashMap<>(vendors);
     }
 
     public StorageVendorConfig resolveConfig() {
-        StorageVendor resolvedVendor = resolveVendor();
-        VendorProperties properties = vendors.get(resolvedVendor.id());
+        StorageVendor resolvedVendor = StorageVendor.fromId(vendor);
+        VendorProperties properties = requireVendorProperties(resolvedVendor);
+        return properties.toConfig(resolvedVendor);
+    }
+
+    private VendorProperties requireVendorProperties(StorageVendor vendor) {
+        VendorProperties properties = vendors.get(vendor.id());
         if (properties == null) {
-            throw new IllegalStateException("Missing storacle.vendors." + resolvedVendor.id() + " configuration");
+            throw new IllegalStateException("Missing storacle.vendors." + vendor.id() + " configuration");
         }
-        return StorageVendorConfig.builder(resolvedVendor)
-                .endpoint(properties.getEndpoint())
-                .region(properties.getRegion())
-                .accessKey(properties.getAccessKey())
-                .secretKey(properties.getSecretKey())
-                .pathStyleAccess(properties.getPathStyleAccess())
-                .options(properties.getOptions())
-                .build();
+        return properties;
     }
 
     public static class VendorProperties {
@@ -112,6 +96,17 @@ public class StoracleProperties {
 
         public void setOptions(Map<String, String> options) {
             this.options = options == null ? new HashMap<>() : new HashMap<>(options);
+        }
+
+        private StorageVendorConfig toConfig(StorageVendor vendor) {
+            return StorageVendorConfig.builder(vendor)
+                    .endpoint(endpoint)
+                    .region(region)
+                    .accessKey(accessKey)
+                    .secretKey(secretKey)
+                    .pathStyleAccess(pathStyleAccess)
+                    .options(options)
+                    .build();
         }
     }
 }
