@@ -1,7 +1,11 @@
 package io.vacivor.storacle.template;
 
 import java.util.Objects;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
+import io.vacivor.storacle.ChecksumAlgorithm;
 import io.vacivor.storacle.ObjectMetadata;
 
 import java.io.ByteArrayInputStream;
@@ -19,6 +23,7 @@ public final class UploadRequest {
     private final long contentLength;
     private final ObjectMetadata metadata;
     private final int peekBytes;
+    private final Set<ChecksumAlgorithm> checksumAlgorithms;
 
     private UploadRequest(Builder builder) {
         this.bucket = requireNonBlank(builder.bucket, "bucket");
@@ -32,6 +37,7 @@ public final class UploadRequest {
         this.contentLength = builder.contentLength;
         this.metadata = builder.metadata;
         this.peekBytes = requirePositive(builder.peekBytes, "peekBytes");
+        this.checksumAlgorithms = Set.copyOf(builder.checksumAlgorithms);
     }
 
     public static Builder builder() {
@@ -70,6 +76,10 @@ public final class UploadRequest {
         return peekBytes;
     }
 
+    public Set<ChecksumAlgorithm> checksumAlgorithms() {
+        return checksumAlgorithms;
+    }
+
     public static final class Builder {
         private String bucket;
         private String objectKey;
@@ -79,6 +89,7 @@ public final class UploadRequest {
         private long contentLength = -1;
         private ObjectMetadata metadata;
         private int peekBytes = 8192;
+        private Set<ChecksumAlgorithm> checksumAlgorithms = new LinkedHashSet<>();
 
         public Builder bucket(String bucket) {
             this.bucket = bucket;
@@ -138,6 +149,19 @@ public final class UploadRequest {
 
         public Builder peekBytes(int peekBytes) {
             this.peekBytes = peekBytes;
+            return this;
+        }
+
+        public Builder checksumAlgorithms(Collection<ChecksumAlgorithm> checksumAlgorithms) {
+            this.checksumAlgorithms = checksumAlgorithms == null
+                    ? new LinkedHashSet<>()
+                    : new LinkedHashSet<>(checksumAlgorithms);
+            return this;
+        }
+
+        public Builder addChecksumAlgorithm(ChecksumAlgorithm checksumAlgorithm) {
+            Objects.requireNonNull(checksumAlgorithm, "checksumAlgorithm must not be null");
+            this.checksumAlgorithms.add(checksumAlgorithm);
             return this;
         }
 

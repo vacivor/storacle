@@ -2,14 +2,14 @@ package io.vacivor.storacle.example;
 
 import java.util.Map;
 
-public record StorageObjectResponse(
+public record ObjectMetadataResponse(
         String bucket,
         String key,
-        String originalFilename,
         String contentType,
         Long contentLength,
-        String eTag,
-        String versionId,
+        String contentDisposition,
+        String cacheControl,
+        Map<String, String> userMetadata,
         Map<String, String> checksums
 ) {
 }
