@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -85,9 +86,9 @@ class ObjectStorageTemplateUploadTest {
         );
 
         assertEquals("hello.txt", result.originalFilename());
-        assertEquals("text/plain", result.contentType());
+        assertEquals("application/octet-stream", result.contentType());
         assertEquals(5L, result.contentLength());
-        assertEquals("text/plain", result.metadata().contentType());
+        assertEquals("application/octet-stream", result.metadata().contentType());
         assertEquals(5L, result.metadata().contentLength());
         assertEquals("3610a686", result.metadata().userMetadata().get("checksum-crc32"));
         assertEquals("no-cache", client.lastMetadata.cacheControl());
@@ -130,6 +131,34 @@ class ObjectStorageTemplateUploadTest {
 
         assertEquals("target.txt", template.copy("source", "a.txt", "target", "target.txt").path().key());
         assertEquals("bucket", template.list("bucket", "demo/").objects().getFirst().path().bucket());
+    }
+
+    @Test
+    void uploadValidatesResolvedContentTypeWithRoutingContext() {
+        RecordingPolicyResolver resolver = new RecordingPolicyResolver();
+        UploadRequest request = UploadRequest.builder()
+                .scene("avatar")
+                .bucket("bucket")
+                .originalFilename("hello.txt")
+                .content("hello".getBytes())
+                .build();
+
+        ObjectStorageTemplate template = new ObjectStorageTemplate(
+                new ReadingClient(),
+                new io.vacivor.storacle.DefaultContentTypeDetector(),
+                new io.vacivor.storacle.UuidFilenameGenerator(),
+                resolver
+        );
+
+        template.upload(request);
+
+        assertEquals(1, resolver.contexts.size());
+        UploadContext context = resolver.contexts.getFirst();
+        assertEquals("avatar", context.scene());
+        assertEquals("bucket", context.bucket());
+        assertEquals("hello.txt", context.originalFilename());
+        assertEquals("application/octet-stream", context.contentType());
+        assertEquals(5L, context.contentLength());
     }
 
     private static final class ReadingClient implements ObjectStorageClient {
@@ -252,6 +281,17 @@ class ObjectStorageTemplateUploadTest {
         public void close() throws IOException {
             closed.set(true);
             delegate.close();
+        }
+    }
+
+    private static final class RecordingPolicyResolver implements ContentTypePolicyResolver {
+        private final ArrayList<UploadContext> contexts = new ArrayList<>();
+
+        @Override
+        public ContentTypePolicy resolve(UploadContext context) {
+            contexts.add(context);
+            return ignored -> {
+            };
         }
     }
 }

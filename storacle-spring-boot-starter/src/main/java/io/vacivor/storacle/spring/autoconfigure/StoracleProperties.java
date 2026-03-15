@@ -10,6 +10,7 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "storacle")
 public class StoracleProperties {
     private String vendor = StorageVendor.AMAZON_S3.id();
+    private ContentTypeDetectorType contentTypeDetector = ContentTypeDetectorType.DEFAULT;
     private Map<String, VendorProperties> vendors = new HashMap<>();
 
     public String getVendor() {
@@ -18,6 +19,14 @@ public class StoracleProperties {
 
     public void setVendor(String vendor) {
         this.vendor = vendor;
+    }
+
+    public ContentTypeDetectorType getContentTypeDetector() {
+        return contentTypeDetector;
+    }
+
+    public void setContentTypeDetector(ContentTypeDetectorType contentTypeDetector) {
+        this.contentTypeDetector = contentTypeDetector == null ? ContentTypeDetectorType.DEFAULT : contentTypeDetector;
     }
 
     public Map<String, VendorProperties> getVendors() {
@@ -108,5 +117,10 @@ public class StoracleProperties {
                     .options(options)
                     .build();
         }
+    }
+
+    public enum ContentTypeDetectorType {
+        DEFAULT,
+        TIKA
     }
 }

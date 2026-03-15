@@ -16,6 +16,7 @@ import java.io.InputStream;
 
 public final class UploadRequest {
     private final String bucket;
+    private final String scene;
     private final String objectKey;
     private final String originalFilename;
     private final String prefix;
@@ -27,6 +28,7 @@ public final class UploadRequest {
 
     private UploadRequest(Builder builder) {
         this.bucket = requireNonBlank(builder.bucket, "bucket");
+        this.scene = builder.scene;
         this.objectKey = builder.objectKey;
         this.originalFilename = builder.originalFilename;
         this.prefix = builder.prefix;
@@ -50,6 +52,10 @@ public final class UploadRequest {
 
     public String objectKey() {
         return objectKey;
+    }
+
+    public String scene() {
+        return scene;
     }
 
     public String originalFilename() {
@@ -82,6 +88,7 @@ public final class UploadRequest {
 
     public static final class Builder {
         private String bucket;
+        private String scene;
         private String objectKey;
         private String originalFilename;
         private String prefix;
@@ -93,6 +100,11 @@ public final class UploadRequest {
 
         public Builder bucket(String bucket) {
             this.bucket = bucket;
+            return this;
+        }
+
+        public Builder scene(String scene) {
+            this.scene = scene;
             return this;
         }
 

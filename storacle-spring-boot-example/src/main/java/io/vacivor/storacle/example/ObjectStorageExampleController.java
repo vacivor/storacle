@@ -38,6 +38,7 @@ public class ObjectStorageExampleController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public StorageObjectResponse upload(
             @RequestParam String bucket,
+            @RequestParam(required = false) String scene,
             @RequestParam(required = false) String key,
             @RequestParam(required = false) String prefix,
             @RequestParam(required = false) List<String> checksumAlgorithm,
@@ -50,6 +51,7 @@ public class ObjectStorageExampleController {
 
         UploadRequest request = UploadRequest.builder()
                 .bucket(bucket)
+                .scene(scene)
                 .objectKey(key)
                 .originalFilename(file.getOriginalFilename())
                 .prefix(prefix)

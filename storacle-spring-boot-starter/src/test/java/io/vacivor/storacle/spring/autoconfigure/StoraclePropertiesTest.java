@@ -41,4 +41,11 @@ class StoraclePropertiesTest {
 
         assertThrows(IllegalStateException.class, properties::resolveConfig);
     }
+
+    @Test
+    void defaultsToDefaultContentTypeDetector() {
+        StoracleProperties properties = new StoracleProperties();
+
+        assertEquals(StoracleProperties.ContentTypeDetectorType.DEFAULT, properties.getContentTypeDetector());
+    }
 }

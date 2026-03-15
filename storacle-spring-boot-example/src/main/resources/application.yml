@@ -6,10 +6,10 @@ spring:
     name: storacle-spring-boot-example
 
 storacle:
+  content-type-detector: tika
   vendor: minio
   vendors:
     minio:
       endpoint: ${STORACLE_MINIO_ENDPOINT:http://192.168.50.152:9000}
       access-key: ${STORACLE_MINIO_ACCESS_KEY:admin}
       secret-key: ${STORACLE_MINIO_SECRET_KEY:password123}
-

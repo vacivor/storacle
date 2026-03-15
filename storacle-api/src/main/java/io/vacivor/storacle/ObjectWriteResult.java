@@ -40,4 +40,17 @@ public record ObjectWriteResult(
                 checksums
         );
     }
+
+    public String checksum(ChecksumAlgorithm algorithm) {
+        String value = checksumOrNull(algorithm);
+        if (value == null) {
+            throw new IllegalArgumentException("Missing checksum for algorithm: " + algorithm);
+        }
+        return value;
+    }
+
+    public String checksumOrNull(ChecksumAlgorithm algorithm) {
+        Objects.requireNonNull(algorithm, "algorithm must not be null");
+        return checksums.get(algorithm);
+    }
 }

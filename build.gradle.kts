@@ -18,6 +18,7 @@ val huaweiObsVersion = "3.25.10"
 val googleCloudStorageVersion = "2.62.1"
 val baiduBosVersion = "0.10.412"
 val aliyunOssVersion = "3.18.5"
+val tikaVersion = "2.9.2"
 
 extra["springBootVersion"] = springBootVersion
 extra["awsSdkVersion"] = awsSdkVersion
@@ -28,6 +29,7 @@ extra["huaweiObsVersion"] = huaweiObsVersion
 extra["googleCloudStorageVersion"] = googleCloudStorageVersion
 extra["baiduBosVersion"] = baiduBosVersion
 extra["aliyunOssVersion"] = aliyunOssVersion
+extra["tikaVersion"] = tikaVersion
 
 allprojects {
     group = rootProject.group

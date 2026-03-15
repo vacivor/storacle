@@ -33,16 +33,24 @@ public final class ObjectStorageTemplate {
     private final ObjectStorageClient client;
     private final ContentTypeDetector contentTypeDetector;
     private final FilenameGenerator filenameGenerator;
+    private final ContentTypePolicyResolver contentTypePolicyResolver;
 
     public ObjectStorageTemplate(ObjectStorageClient client) {
-        this(client, new DefaultContentTypeDetector(), new UuidFilenameGenerator());
+        this(client, new DefaultContentTypeDetector(), new UuidFilenameGenerator(), new DefaultContentTypePolicyResolver());
     }
 
     public ObjectStorageTemplate(ObjectStorageClient client, ContentTypeDetector contentTypeDetector,
                             FilenameGenerator filenameGenerator) {
+        this(client, contentTypeDetector, filenameGenerator, new DefaultContentTypePolicyResolver());
+    }
+
+    public ObjectStorageTemplate(ObjectStorageClient client, ContentTypeDetector contentTypeDetector,
+                                 FilenameGenerator filenameGenerator, ContentTypePolicyResolver contentTypePolicyResolver) {
         this.client = Objects.requireNonNull(client, "client must not be null");
         this.contentTypeDetector = Objects.requireNonNull(contentTypeDetector, "contentTypeDetector must not be null");
         this.filenameGenerator = Objects.requireNonNull(filenameGenerator, "filenameGenerator must not be null");
+        this.contentTypePolicyResolver = Objects.requireNonNull(contentTypePolicyResolver,
+                "contentTypePolicyResolver must not be null");
     }
 
     public ObjectWriteResult upload(UploadRequest request) {
@@ -71,6 +79,7 @@ public final class ObjectStorageTemplate {
                     FilenameContext context = FilenameContext.of(request.originalFilename(), request.prefix(), contentType);
                     objectKey = filenameGenerator.generate(context);
                 }
+                validateContentType(request, objectKey, resolvedMetadata);
                 Set<ChecksumAlgorithm> checksumAlgorithms = request.checksumAlgorithms();
                 if (checksumAlgorithms.isEmpty()) {
                     ObjectWriteResult result = client.put(ObjectPath.of(request.bucket(), objectKey), content, resolvedMetadata);
@@ -322,5 +331,18 @@ public final class ObjectStorageTemplate {
                 .checksumAlgorithms(checksumAlgorithms);
         contentConfigurer.accept(builder);
         return builder.build();
+    }
+
+    private void validateContentType(UploadRequest request, String objectKey, ObjectMetadata metadata) {
+        UploadContext context = new UploadContext(
+                request.scene(),
+                request.bucket(),
+                objectKey,
+                request.originalFilename(),
+                metadata.contentType(),
+                metadata.contentLength(),
+                metadata
+        );
+        contentTypePolicyResolver.resolve(context).validate(context);
     }
 }

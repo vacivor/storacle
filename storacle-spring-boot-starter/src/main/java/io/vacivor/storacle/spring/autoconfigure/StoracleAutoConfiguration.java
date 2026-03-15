@@ -4,9 +4,12 @@ import io.vacivor.storacle.ContentTypeDetector;
 import io.vacivor.storacle.DefaultContentTypeDetector;
 import io.vacivor.storacle.FilenameGenerator;
 import io.vacivor.storacle.ObjectStorageClient;
+import io.vacivor.storacle.TikaContentTypeDetector;
 import io.vacivor.storacle.UuidFilenameGenerator;
 import io.vacivor.storacle.vendor.ObjectStorageClientFactoryRegistry;
 import io.vacivor.storacle.StorageVendorConfig;
+import io.vacivor.storacle.template.ContentTypePolicyResolver;
+import io.vacivor.storacle.template.DefaultContentTypePolicyResolver;
 import io.vacivor.storacle.template.ObjectStorageTemplate;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -32,8 +35,11 @@ public class StoracleAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public ContentTypeDetector contentTypeDetector() {
-        return new DefaultContentTypeDetector();
+    public ContentTypeDetector contentTypeDetector(StoracleProperties properties) {
+        return switch (properties.getContentTypeDetector()) {
+            case TIKA -> new TikaContentTypeDetector();
+            case DEFAULT -> new DefaultContentTypeDetector();
+        };
     }
 
     @Bean
@@ -44,9 +50,16 @@ public class StoracleAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public ContentTypePolicyResolver contentTypePolicyResolver() {
+        return new DefaultContentTypePolicyResolver();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public ObjectStorageTemplate objectStorageTemplate(ObjectStorageClient client,
                                                        ContentTypeDetector detector,
-                                                       FilenameGenerator generator) {
-        return new ObjectStorageTemplate(client, detector, generator);
+                                                       FilenameGenerator generator,
+                                                       ContentTypePolicyResolver contentTypePolicyResolver) {
+        return new ObjectStorageTemplate(client, detector, generator, contentTypePolicyResolver);
     }
 }
