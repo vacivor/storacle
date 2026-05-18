@@ -18,7 +18,7 @@ val huaweiObsVersion = "3.25.10"
 val googleCloudStorageVersion = "2.68.0"
 val baiduBosVersion = "0.10.414"
 val aliyunOssVersion = "3.18.5"
-val tikaVersion = "3.2.3"
+val tikaVersion = "3.3.0"
 
 extra["springBootVersion"] = springBootVersion
 extra["awsSdkVersion"] = awsSdkVersion
