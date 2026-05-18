@@ -10,7 +10,7 @@ description = "storacle"
 
 val javaVersion = 25
 val springBootVersion = "4.0.2"
-val awsSdkVersion = "2.25.66"
+val awsSdkVersion = "2.44.7"
 val minioVersion = "8.6.0"
 val tencentCosVersion = "5.6.261"
 val qiniuVersion = "7.19.0"
