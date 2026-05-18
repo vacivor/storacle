@@ -16,7 +16,7 @@ val tencentCosVersion = "5.6.269"
 val qiniuVersion = "7.19.0"
 val huaweiObsVersion = "3.25.10"
 val googleCloudStorageVersion = "2.62.1"
-val baiduBosVersion = "0.10.412"
+val baiduBosVersion = "0.10.414"
 val aliyunOssVersion = "3.18.5"
 val tikaVersion = "3.2.3"
 
